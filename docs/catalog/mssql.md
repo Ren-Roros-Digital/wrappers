@@ -67,15 +67,25 @@ All parameter keys are handled case-insensitive.
 
 ### Connecting to SQL Server
 
-We need to provide Postgres with the credentials to connect to SQL Server. We can do this using the `create server` command:
+We need to provide Postgres with the credentials to connect to SQL Server. You can pass the connection string directly or reference a Vault secret by id or by name using the `create server` command:
 
-=== "With Vault"
+=== "With Vault (Secret ID)"
 
     ```sql
     create server mssql_server
       foreign data wrapper mssql_wrapper
       options (
         conn_string_id '<key_ID>' -- The Key ID from above.
+      );
+    ```
+
+=== "With Vault (Secret Name)"
+
+    ```sql
+    create server mssql_server
+      foreign data wrapper mssql_wrapper
+      options (
+        conn_string_name '<secret_name>' -- The secret name from Vault.
       );
     ```
 
