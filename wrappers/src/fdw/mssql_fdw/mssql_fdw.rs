@@ -94,7 +94,7 @@ impl CellFormatter for MssqlCellFormatter {
 }
 
 #[wrappers_fdw(
-    version = "0.1.3",
+    version = "0.1.4",
     author = "Supabase",
     website = "https://github.com/supabase/wrappers/tree/main/wrappers/src/fdw/mssql_fdw",
     error_type = "MssqlFdwError"
@@ -199,13 +199,27 @@ impl MssqlFdw {
 impl ForeignDataWrapper<MssqlFdwError> for MssqlFdw {
     fn new(server: ForeignServer) -> MssqlFdwResult<Self> {
         let rt = create_async_runtime()?;
-        let conn_str = match server.options.get("conn_string") {
-            Some(conn_str) => conn_str.to_owned(),
-            None => {
-                let conn_str_id = require_option("conn_string_id", &server.options)?;
-                get_vault_secret(conn_str_id).unwrap_or_default()
-            }
-        };
+        let conn_str = server
+            .options
+            .get("conn_string")
+            .map(|conn_str| conn_str.to_owned())
+            .or_else(|| {
+                server
+                    .options
+                    .get("conn_string_id")
+                    .and_then(|conn_str_id| get_vault_secret(conn_str_id))
+                    .or_else(|| {
+                        server
+                            .options
+                            .get("conn_string_name")
+                            .and_then(|conn_str_name| get_vault_secret_by_name(conn_str_name))
+                    })
+            })
+            .ok_or_else(|| {
+                OptionsError::OptionNameNotFound(
+                    "conn_string, conn_string_id or conn_string_name".to_string(),
+                )
+            })?;
         let config = Config::from_ado_string(&conn_str)?;
 
         stats::inc_stats(Self::FDW_NAME, stats::Metric::CreateTimes, 1);
